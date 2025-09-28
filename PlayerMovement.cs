@@ -1,104 +1,107 @@
+using TMPro;
 using UnityEngine;
 
-public class PlayerMovement : MonoBehaviour
+public class PlayerMovementCamera : MonoBehaviour
 {
     [Header("Movement")]
-    public float movementForce = 100f;
-    private Rigidbody rb;
-    public float maxSpeed = 20f;
+    public float walkSpeed = 5f;
+    public float sprintSpeed = 9f;
 
-    [Header("Jumping")]
-    public float jumpDistance = 1f;
-    public float jumpForce = 200f;
-    public LayerMask ground;
+    [Header("Jump & Gravity")]
+    public float jumpHeight = 2f;
+    public float gravity = -9.81f;
 
-    [Header("Sliding")] public float slideForce = 200f;
-    public float slideHeight = 1f;
-
-    private float normalHeight;
-    private CapsuleCollider capsule;
-    private bool sliding = false;
-    
     [Header("Camera")]
     public Camera cam;
+    public float sensitivity = 50f;
 
-    public float sensitivity= 50f;
-    
+    [Header("UI")]
+    public TextMeshProUGUI sprintStatusText; // <- legăm textul din inspector
+
+    private CharacterController controller;
+    private Vector3 velocity;
+    private bool isGrounded;
+
+    private float cameraPitch = 0f;
+    private PlayerStatus playerStatus;
+
     void Start()
     {
+        controller = GetComponent<CharacterController>();
+        playerStatus = GetComponent<PlayerStatus>();
         Cursor.lockState = CursorLockMode.Locked;
-        rb = gameObject.GetComponent<Rigidbody>();
-        capsule = gameObject.GetComponent<CapsuleCollider>();
-        normalHeight = capsule.height;
+        
+        
+        UpdateSprintUI(); // setăm textul la start
     }
-    
+
     void Update()
     {
+        HandleMovement();
+        HandleCamera();
+        UpdateSprintUI(); // actualizăm UI-ul în fiecare frame
+    }
+
+    private void HandleMovement()
+    {
+        isGrounded = controller.isGrounded;
+        if (isGrounded && velocity.y < 0)
+        {
+            velocity.y = -2f;
+        }
+
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
-        
-        if (Grounded() && !isFast())
-        {
-            rb.AddForce(gameObject.transform.forward * movementForce * vertical * Time.deltaTime,  ForceMode.Impulse);
-            rb.AddForce(gameObject.transform.right * movementForce * horizontal * Time.deltaTime,  ForceMode.Impulse);
-        }
-        
-        cameraRotation();
-        if(Input.GetKeyDown(KeyCode.Space) && Grounded() && !sliding)
-            Jump();
-        
-        if(Input.GetKeyDown(KeyCode.LeftControl))
-            OnSlide();
-        
-        if(Input.GetKeyUp(KeyCode.LeftControl))
-            CancelSlide();
-    }
 
-    private void cameraRotation()
-    {
-        float cameraX = cam.transform.localRotation.eulerAngles.x;
-        float cameraY = gameObject.transform.rotation.eulerAngles.y;
-        
-        float mouseX = Input.GetAxis("Mouse X");
-        float mouseY = -Input.GetAxis("Mouse Y");
-        
-        cameraX += mouseY * sensitivity;
-        cameraY += mouseX * sensitivity;
-        
-        gameObject.transform.rotation = Quaternion.Euler(0, cameraY, 0);
-        cam.transform.localRotation = Quaternion.Euler(cameraX, 0, 0);
-    }
+        Vector3 move = cam.transform.forward * vertical + cam.transform.right * horizontal;
+        move.y = 0f;
 
-    private bool Grounded()
-    {
-        if (Physics.Raycast(transform.position, Vector3.down, jumpDistance, ground))
+        float speed = walkSpeed;
+
+        if (playerStatus != null && playerStatus.canSprint)
         {
-            return true;
+            if (Input.GetKey(KeyCode.LeftShift))
+            {
+                speed = sprintSpeed;
+            }
         }
 
-        return false;
-    }
-    
-    private void Jump()
-    {
-        rb.AddForce(gameObject.transform.up * jumpForce, ForceMode.Impulse);
+        controller.Move(move * speed * Time.deltaTime);
+
+        if (Input.GetButtonDown("Jump") && isGrounded)
+        {
+            velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+        }
+
+        velocity.y += gravity * Time.deltaTime;
+        controller.Move(velocity * Time.deltaTime);
     }
 
-    private void OnSlide()
+    private void HandleCamera()
     {
-        capsule.height = slideHeight;
-        rb.AddForce(gameObject.transform.forward * slideForce, ForceMode.Impulse);
-        sliding = true;
+        float mouseX = Input.GetAxis("Mouse X") * sensitivity * Time.deltaTime;
+        float mouseY = Input.GetAxis("Mouse Y") * sensitivity * Time.deltaTime;
+
+        cameraPitch -= mouseY;
+        cameraPitch = Mathf.Clamp(cameraPitch, -90f, 90f);
+
+        cam.transform.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
+        transform.Rotate(Vector3.up * mouseX);
     }
 
-    private void CancelSlide()
+    private void UpdateSprintUI()
     {
-        capsule.height = normalHeight;
-        sliding = false;
-    }
+        if (sprintStatusText == null || playerStatus == null) return;
 
-    private bool isFast()
-    {
-        return rb.linearVelocity.magnitude > maxSpeed;
+        if (playerStatus.canSprint)
+        {
+            sprintStatusText.text = "Sprint Available";
+            sprintStatusText.color = Color.green;
+        }
+        else
+        {
+            sprintStatusText.text = "Sprint Disabled";
+            sprintStatusText.color = Color.red;
+        }
     }
 }
