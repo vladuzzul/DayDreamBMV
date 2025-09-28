@@ -17,7 +17,7 @@ public class SacrificeMenu : MonoBehaviour
     public void OnSacrificeArmClicked()
     {
         if (WaveManager.Instance != null)
-            WaveManager.Instance.SacrificeArmGiveAR();
+            WaveManager.Instance.SacrificeArmGiveAR(arDamage, arMaxAmmo, arFullAuto);
     }
 
     public void OnCancelClicked()

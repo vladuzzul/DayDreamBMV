@@ -16,18 +16,11 @@ public class WaveManager : MonoBehaviour
     public TextMeshProUGUI hintText; // "Press Space to continue or E for sacrifice"
     public GameObject sacrificeMenuPanel; // panel with sacrifice options
 
-    [Header("Weapons")]
-    public GameObject arPrefab;       // Prefab-ul AR (cu scriptul propriu de gun)
-    public Transform weaponSlot;      // WeaponHolder (slot-ul din player pentru arme)
-    private GameObject currentWeapon;
-    
     [Header("Settings")]
     public KeyCode continueKey = KeyCode.Space;
     public KeyCode openMenuKey = KeyCode.E;
 
     private bool waveFinished = false;
-    
-    
 
     private void Awake()
     {
@@ -40,7 +33,6 @@ public class WaveManager : MonoBehaviour
         enemiesAlive = totalEnemiesThisWave;
         if (waveCompletePanel != null) waveCompletePanel.SetActive(false);
         if (sacrificeMenuPanel != null) sacrificeMenuPanel.SetActive(false);
-        ResetSacrifices();
     }
 
     public void RegisterEnemy() // call this when spawning enemy if you want dynamic count
@@ -65,8 +57,9 @@ public class WaveManager : MonoBehaviour
         if (waveCompletePanel != null)
         {
             waveCompletePanel.SetActive(true);
-            if (waveCompleteText != null) waveCompleteText.text = "Wave 1 completed";
-            if (hintText != null) hintText.text = $"Press {continueKey} to continue or {openMenuKey} to open Sacrifice Menu";
+            if (waveCompleteText != null) waveCompleteText.text = "Wave completed";
+            if (hintText != null) hintText.text =
+                $"Press {continueKey} to continue, {openMenuKey} for Sacrifice Menu \n1 to Sacrifice Arm\t 2 to Sacrifice Leg";
         }
     }
 
@@ -82,13 +75,13 @@ public class WaveManager : MonoBehaviour
         {
             ContinuePressed();
         }
-        else if (Input.GetKeyDown(KeyCode.Alpha1)) // apăsăm 1
+        else if (Input.GetKeyDown(KeyCode.Alpha1)) // apăsăm 1 pentru braț
         {
-            SacrificeArmGiveAR(); 
+            SacrificeArmGiveAR(25, 60, true);
         }
-        else if (Input.GetKeyDown(KeyCode.Alpha2)) // apăsăm 2
+        else if (Input.GetKeyDown(KeyCode.Alpha2)) // apăsăm 2 pentru picior
         {
-            SacrificeLegGiveMedkit(50); 
+            SacrificeLegGiveMedkit(50);
         }
     }
 
@@ -110,10 +103,9 @@ public class WaveManager : MonoBehaviour
         Debug.Log("Continue pressed - start next wave (implement spawn logic).");
     }
 
-    // Called by UI buttons
+    // Called by UI buttons OR hotkeys
     public void SacrificeLegGiveMedkit(int medkitHealAmount)
     {
-        // apply sacrifice to player
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
@@ -129,7 +121,6 @@ public class WaveManager : MonoBehaviour
             }
         }
 
-        // close UI and mark continue
         if (sacrificeMenuPanel != null) sacrificeMenuPanel.SetActive(false);
         if (waveCompletePanel != null) waveCompletePanel.SetActive(false);
         waveFinished = false;
@@ -137,35 +128,23 @@ public class WaveManager : MonoBehaviour
         Debug.Log("Leg sacrificed: gave medkit and disabled sprint.");
     }
 
-    public void SacrificeArmGiveAR()
+    public void SacrificeArmGiveAR(int arDamage, int arMaxAmmo, bool arFullAuto)
     {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
             PlayerStatus status = player.GetComponent<PlayerStatus>();
+            GunScript pistol = player.GetComponentInChildren<GunScript>(); // assumes pistol is child of player
             if (status != null)
             {
-                // sacrificiu braț = pierzi ADS
                 status.canAim = false;
             }
-
-            if (weaponSlot != null)
+            if (pistol != null)
             {
-                GunScript[] guns = weaponSlot.GetComponentsInChildren<GunScript>(true);
-
-                foreach (GunScript gun in guns)
-                {
-                    if (gun.gameObject.name.Contains("Pistol"))
-                    {
-                        gun.enabled = false; // dezactivează pistolul
-                        gun.gameObject.SetActive(false); // opțional ascunzi și mesh-ul
-                    }
-                    else if (gun.gameObject.name.Contains("AR"))
-                    {
-                        gun.enabled = true; // activează AR-ul
-                        gun.gameObject.SetActive(true);
-                    }
-                }
+                pistol.fullAuto = arFullAuto;
+                pistol.damage = arDamage;
+                pistol.maxAmmo = arMaxAmmo;
+                pistol.SetAmmoImmediate(arMaxAmmo); // helper from your Pistol script
             }
         }
 
@@ -173,20 +152,6 @@ public class WaveManager : MonoBehaviour
         if (waveCompletePanel != null) waveCompletePanel.SetActive(false);
         waveFinished = false;
 
-        Debug.Log("Arm sacrificed: Pistol disabled, AR enabled, aiming disabled.");
+        Debug.Log("Arm sacrificed: gave AR and disabled aiming.");
     }
-
-    public void ResetSacrifices()
-    {
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
-        {
-            PlayerStatus status = player.GetComponent<PlayerStatus>();
-            if (status != null)
-            {
-                status.canSprint = true; // Permite sprintul din nou
-            }
-        }
-    }
-    
 }
